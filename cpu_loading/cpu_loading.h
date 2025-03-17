@@ -1,14 +1,14 @@
 #ifndef __included_cpu_loading_h__
 #define __included_cpu_loading_h__
 
-#include <vnet/vnet.h>
+#include "vnet/vnet.h"
 
 
 #define DEFAULT_SAMPLE_TIME 1.5
 
 #define for_each_poll_type_node \
-    _(dpdk_input) \
-    _(virtio_input)
+    _(dpdk) \
+    _(virtio) \
 
 enum {
 #define _(n) POLLING_NODE_##n,
@@ -18,7 +18,7 @@ enum {
 };
 
 static const char *poll_type_str[] = {
-#define _(n) #n,
+#define _(n) #n "-input",
     for_each_poll_type_node
 #undef _
 };

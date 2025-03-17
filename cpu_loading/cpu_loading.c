@@ -4,7 +4,7 @@
 #include "vnet/vnet.h"
 #include "vnet/plugin/plugin.h"
 #include "vlib/node_funcs.h"
-#include <vpp/app/version.h>
+#include "vpp/app/version.h"
 #include "cpu_loading/cpu_loading.h"
 #include <string.h>
 
@@ -40,7 +40,7 @@ static uword cpu_loading_process (vlib_main_t * vm, vlib_node_runtime_t * rt, vl
 /**
  * @brief 统计 idle time 和 total time
  **/
-static uword cpu_loading_get_dpdk_idle_polling_count(
+static uword cpu_loading_time_statistics (
     struct vlib_main_t *vm, struct vlib_node_runtime_t *node, struct vlib_frame_t *frame)
 {
     int i;
@@ -111,12 +111,13 @@ static clib_error_t *cpu_loading_last_init(struct vlib_main_t * vm)
         cmp->total_time[i] = 0;
         cmp->last_cpu_loading[i] = 0;
 
-        vlib_node_set_dispatch_wrapper(vm, cpu_loading_get_dpdk_idle_polling_count);
+        vlib_node_set_dispatch_wrapper(vm, cpu_loading_time_statistics);
     }
     return error;
 }
 
 VLIB_INIT_FUNCTION(cpu_loading_init);
+
 VLIB_MAIN_LOOP_ENTER_FUNCTION(cpu_loading_last_init);
 
 VLIB_REGISTER_NODE (perfmon_periodic_node) = {

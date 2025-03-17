@@ -11,14 +11,18 @@ clib_error_t *cpu_loading_show_cpu_loading(struct vlib_main_t * vm,
     int i, j;
     clib_error_t *error = 0;
     cpu_loading_main_t *cpm = &cpu_loading_main;
+
     vlib_cli_output(vm, "sampling time: %.2f", cpm->sampling_time);
     vlib_cli_output(vm, "---------------------", cpm->sampling_time);
     for (i = 0; i < vlib_get_n_threads(); i++) {
         vlib_cli_output(vm, "thread %u:", i);
-        for (j = 0; j < POLLING_NODE_MAX; j++)
-            vlib_cli_output(vm, "    %15s %s %lu", poll_type_str[j], "idle clock:", cpm->idle_time[j][i]);
-        vlib_cli_output(vm, "    %15s %lu", "total clock:", cpm->total_time[i]);
-        vlib_cli_output(vm, "    %15s %.2f%%", "last cpu loading:", cpm->last_cpu_loading[i]);
+        for (j = 0; j < POLLING_NODE_MAX; j++) {
+            if (cpm->polling_node_index[j][i] == ~0)
+                continue;
+            vlib_cli_output(vm, "    %s %s %lu", poll_type_str[j], "idle clock:", cpm->idle_time[j][i]);
+        }
+        vlib_cli_output(vm, "    %s %lu", "total clock:", cpm->total_time[i]);
+        vlib_cli_output(vm, "    %s %.2f%%", "last cpu loading:", cpm->last_cpu_loading[i]);
     }
     return error;
 }
@@ -31,8 +35,9 @@ clib_error_t *cpu_loading_set_sampling_time(struct vlib_main_t *vm,
 {
     clib_error_t *error = 0;
     cpu_loading_main_t *cpm = &cpu_loading_main;
+
     if (unformat(input, "%f", &cpm->sampling_time) == 0)
-        error = clib_error_return(0, "please input a valid sample time");
+        error = clib_error_return(0, "please input a valid sampling time");
     return error;
 }
 
