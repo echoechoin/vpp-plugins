@@ -5,7 +5,7 @@
 /**
  * @brief 查询CPU使用率
  **/
-clib_error_t *cpu_loading_show_cpu_loading(struct vlib_main_t * vm,
+clib_error_t *show_cpu_loading(struct vlib_main_t * vm,
         unformat_input_t * input, struct vlib_cli_command_t * cmd)
 {
     int i, j;
@@ -41,13 +41,13 @@ clib_error_t *cpu_loading_set_sampling_time(struct vlib_main_t *vm,
     return error;
 }
 
-VLIB_CLI_COMMAND (vlib_cli_show_cpu_loading_command, static) = {
+VLIB_CLI_COMMAND (show_cpu_loading_command, static) = {
     .path = "show cpu-loading",
     .short_help = "Show commands",
-    .function = cpu_loading_show_cpu_loading,
+    .function = show_cpu_loading,
 };
 
-VLIB_CLI_COMMAND (cpu_loading_set_sampling_time_command, static) = {
+VLIB_CLI_COMMAND (set_cpu_loading_sampling_time_command, static) = {
     .path = "set cpu-loading sampling-time",
     .long_help = "set cpu-loading <float>",
     .short_help = "set sampling time",

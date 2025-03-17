@@ -120,7 +120,7 @@ VLIB_INIT_FUNCTION(cpu_loading_init);
 
 VLIB_MAIN_LOOP_ENTER_FUNCTION(cpu_loading_last_init);
 
-VLIB_REGISTER_NODE (perfmon_periodic_node) = {
+VLIB_REGISTER_NODE (cpu_loading_caculating_node) = {
   .function = cpu_loading_process,
   .type = VLIB_NODE_TYPE_PROCESS,
   .name = "cpu-loading-process",
