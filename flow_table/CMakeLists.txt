@@ -1,7 +1,8 @@
 add_vpp_plugin(flow_table
     SOURCES
-    include/flow_table.h
-    include/node.h
-    flow_table.c
-    node.c
+    core/include/flow_table.h
+    core/include/node.h
+    core/flow_table.c
+    core/node.c
+    core/cli.c
 )
