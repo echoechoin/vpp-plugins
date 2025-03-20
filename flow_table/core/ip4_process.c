@@ -56,6 +56,7 @@ vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 		if (flow == NULL)
 			return VNF_ACCEPT;
 
+		flow->protocol = protocol;
 		vlib_buffer_set_flow(b, flow);
 
 		/* Init flow_entry and store it in hash_table */

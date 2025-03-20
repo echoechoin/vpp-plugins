@@ -51,6 +51,9 @@ typedef struct {
 	flow_key_t key;
 	flow_entry_t flow_entry[FLOW_DIR_MAX];
 
+	/* ip protocol: e.g. IP_PROTO_TCP == 6, IP_PROTO_UDP == 17 */
+	u8 protocol;
+
 	/* flow state: e.g. tcp state SYN_SENT, SYN_RECV, etc */
 	u8 state;
 } flow_t;
