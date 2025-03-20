@@ -18,12 +18,13 @@ typedef enum {
 typedef struct {
 	ip_address_t src;
 	ip_address_t dst;
-	u8 protocol;
 	u16 src_port;
 	u16 dst_port;
+	u8 protocol;
 } flow_key_t;
 
 #define SWAP(a, b) do { typeof(a) tmp = (a); (a) = (b); (b) = tmp; } while (0)
+#define FLOW_UNSET 0
 
 static inline
 void flow_key_reverse(flow_key_t *key)
@@ -34,6 +35,7 @@ void flow_key_reverse(flow_key_t *key)
 
 /** Flow entry **/
 typedef struct {
+	void *flow;
 	u8 smac[6];
 	u8 dmac[6];
 	ip_address_t src;
@@ -46,7 +48,11 @@ typedef struct {
 /** Flow **/
 typedef struct {
 	u32 sw_if_index;
-	flow_entry_t flow[FLOW_DIR_MAX];
+	flow_key_t key;
+	flow_entry_t flow_entry[FLOW_DIR_MAX];
+
+	/* flow state: e.g. tcp state SYN_SENT, SYN_RECV, etc */
+	u8 state;
 } flow_t;
 
 typedef struct {
@@ -129,35 +135,47 @@ flow_t *flow_table_alloc_flow()
 }
 
 /**
- * @brief Init flow entry
+ * @brief Update flow entry
  **/
 static inline
-void flow_table_flow_init(flow_t *flow, flow_key_t *key, u32 sw_if_index)
+void flow_table_update_flow(flow_t *flow, flow_key_t *key, flow_dir_t direction)
 {
-	memset(flow, 0, sizeof(flow_t));
-	flow->flow[FLOW_DIR_IN].src = key->src;
-	flow->flow[FLOW_DIR_IN].dst = key->dst;
-	flow->flow[FLOW_DIR_IN].protocol = key->protocol;
-	flow->flow[FLOW_DIR_IN].src_port = key->src_port;
-	flow->flow[FLOW_DIR_IN].dst_port = key->dst_port;
-
-	flow->sw_if_index = sw_if_index;
+	flow->flow_entry[direction].src = key->src;
+	flow->flow_entry[direction].dst = key->dst;
+	flow->flow_entry[direction].protocol = key->protocol;
+	flow->flow_entry[direction].src_port = key->src_port;
+	flow->flow_entry[direction].dst_port = key->dst_port;
+	flow->flow_entry[direction].flow = flow;
 }
 
 /**
- * @brief set ~0 means buffer is not associated with any flow.
+ * @brief Init flow entry
  **/
 static inline
-void flow_table_init_buffer(vlib_buffer_t *b)
+void flow_table_init_flow(flow_t *flow, flow_key_t *key, u32 sw_if_index, flow_dir_t direction)
 {
-	((u32 *)(b->data - VLIB_BUFFER_PRE_DATA_SIZE))[0] = ~0;
+	memset(flow, 0, sizeof(flow_t));
+	flow_table_update_flow(flow, key, direction);
+
+	if (sw_if_index != ~0)
+		flow->sw_if_index = sw_if_index;
+}
+
+
+/**
+ * @brief set FLOW_UNSET means buffer is not associated with any flow.
+ **/
+static inline
+void vlib_buffer_init_flow(vlib_buffer_t *b)
+{
+	((u32 *)(b->data - VLIB_BUFFER_PRE_DATA_SIZE))[0] = FLOW_UNSET;
 }
 
 /**
  * @brief Store flow to vlib buffer
  **/
 static inline
-void flow_table_store_flow(vlib_buffer_t *b, flow_t *flow)
+void vlib_buffer_set_flow(vlib_buffer_t *b, flow_t *flow)
 {
 	u32 flow_index = flow_table_get_index_by_flow(flow);
 	((u32 *)(b->data - VLIB_BUFFER_PRE_DATA_SIZE))[0] = flow_index;
@@ -167,7 +185,7 @@ void flow_table_store_flow(vlib_buffer_t *b, flow_t *flow)
  * @brief Get flow from vlib buffer
  **/
 static inline
-flow_t *flow_table_get_flow(vlib_buffer_t *b)
+flow_t *vlib_buffer_get_flow(vlib_buffer_t *b)
 {
 	u32 flow_index = ((u32 *)(b->data - VLIB_BUFFER_PRE_DATA_SIZE))[0];
 	if (flow_index == ~0)

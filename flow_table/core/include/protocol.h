@@ -5,15 +5,15 @@
 #include "flow.h"
 #include "vnet/ip/ip_packet.h"
 
-typedef vnetfilter_action_t (*parse_flow_key_function) (vlib_buffer_t *b, flow_key_t *key, bool is_reverse);
-typedef vnetfilter_action_t (*init_state_function) (vlib_buffer_t *b, flow_key_t *key);
-typedef vnetfilter_action_t (*update_state_function) (vlib_buffer_t *b, flow_key_t *key);
+typedef vnetfilter_action_t (*parse_flow_key_function) (vlib_buffer_t *b, flow_key_t *key);
+typedef vnetfilter_action_t (*init_state_function) (vlib_buffer_t *b);
+typedef vnetfilter_action_t (*update_state_function) (vlib_buffer_t *b);
 
 typedef struct {
 	parse_flow_key_function parse_key;
 	init_state_function init_state;
 	update_state_function update_state;
-} protocol_t;
+} protocol_handler_t;
 
 /**
  * @brief Register callback for specific protocol
@@ -21,7 +21,7 @@ typedef struct {
  * @param protocol Protocol number
  * @return 0 on success, -1 on failure
  */
-int protocol_register(u8 protocol, protocol_t *proto);
+int protocol_handler_register(u8 protocol, protocol_handler_t *proto);
 
 /**
  * @brief Get protocol callback functions by protocol number
@@ -29,6 +29,6 @@ int protocol_register(u8 protocol, protocol_t *proto);
  * @param protocol Protocol number
  * @return Protocol callback functions
  */
-protocol_t *protocol_get(u8 protocol);
+protocol_handler_t *protocol_handler_get(u8 protocol);
 
 #endif

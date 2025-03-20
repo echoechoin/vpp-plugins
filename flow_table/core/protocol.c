@@ -1,14 +1,14 @@
 #include "include/protocol.h"
 
-static protocol_t protocols[IP_PROTOCOL_RESERVED + 1];
+static protocol_handler_t protocol_handlers[IP_PROTOCOL_RESERVED + 1];
 
-int protocol_register(u8 protocol, protocol_t *proto)
+int protocol_handler_register(u8 protocol, protocol_handler_t *proto)
 {
-	protocols[protocol] = *proto;
+	protocol_handlers[protocol] = *proto;
 	return 0;
 }
 
-protocol_t *protocol_get(u8 protocol)
+protocol_handler_t *protocol_handler_get(u8 protocol)
 {
-	return &protocols[protocol];
+	return &protocol_handlers[protocol];
 }

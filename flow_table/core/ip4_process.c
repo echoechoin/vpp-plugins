@@ -14,14 +14,15 @@
 
 vnetfilter_action_t ip4_pre_process(vlib_buffer_t *b)
 {
-	flow_table_init_buffer(b);
+	vlib_buffer_init_flow(b);
     return VNF_ACCEPT;
 }
 
 vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 {
 	u32 sw_if_index;
-	uword *hash_table;
+	uword *hash_table, hash_key;
+	flow_entry_t *flow_entry;
 	flow_t *flow;
 	ip4_header_t *ih4;
 	flow_key_t key;
@@ -43,28 +44,30 @@ vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 	key.dst_port = 0;
 
 	/* Parse L4 header and fill in flow key */
-	protocol_get(protocol)->parse_key(b, &key, false);
-	uword hash_key = flow_table_hash(&key);
+	protocol_handler_get(protocol)->parse_key(b, &key);
+	hash_key = flow_table_hash(&key);
 	
-	/* Get flow from flow table */
+	/* Get flow from hash_table */
 	hash_table = flow_table_get_worker_ctx()->flows_hash_table;
-	flow = (flow_t *)hash_get(hash_table, hash_key);
-	if (flow == NULL) {
+	flow_entry = (flow_entry_t *)hash_get(hash_table, hash_key);
+	if (flow_entry == NULL) {
 		sw_if_index = vnet_buffer(b)->sw_if_index[VLIB_RX];
 		flow = flow_table_alloc_flow();
 		if (flow == NULL)
 			return VNF_ACCEPT;
 
-		/* Init flow entry and store it in flow hash table */
-		flow_table_flow_init(flow, &key, sw_if_index);
-		hash_set(hash_table, hash_key, (uword)&flow->flow[FLOW_DIR_IN]);
+		vlib_buffer_set_flow(b, flow);
 
-		/* Init flow stats */
-		protocol_get(protocol)->init_state(b, &key);
+		/* Init flow_entry and store it in hash_table */
+		flow_table_init_flow(flow, &key, sw_if_index, FLOW_DIR_IN);
+		hash_set(hash_table, hash_key, (uword)&flow->flow_entry[FLOW_DIR_IN]);
+
+		/* Init flow state */
+		protocol_handler_get(protocol)->init_state(b);
+	} else {
+		/* Update flow state */
+		protocol_handler_get(protocol)->update_state(b);
 	}
-
-	/* Update flow stats */
-	protocol_get(protocol)->update_state(b, &key);
 
     return VNF_ACCEPT;
 }
@@ -72,11 +75,24 @@ vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 vnetfilter_action_t ip4_output_process(vlib_buffer_t *b)
 {
 	flow_t *flow;
+	flow_key_t key;
+	uword *hash_table, hash_key;
 
-	flow = flow_table_get_flow(b);
+	flow = vlib_buffer_get_flow(b);
 	if (flow == NULL)
 		return VNF_ACCEPT;
 
+	if (!flow->flow_entry[FLOW_DIR_OUT].flow) {
+		/* Create reverse flow entry */
+		key = flow->key;
+		flow_key_reverse(&key);
+		flow_table_update_flow(flow, &key, FLOW_DIR_OUT);
+
+		/* Save reverse flow_entry to hash table */
+		hash_table = flow_table_get_worker_ctx()->flows_hash_table;
+		hash_key = flow_table_hash(&key);
+		hash_set(hash_table, hash_key, (uword)&flow->flow_entry[FLOW_DIR_OUT]);
+	}
 	
     return VNF_ACCEPT;
 }
