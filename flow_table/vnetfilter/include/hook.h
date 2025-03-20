@@ -19,7 +19,9 @@ typedef struct {
 	_(l2_output_ip6, "l2-output-ip6", "l2-output-feat-arc-end") \
 
 #define _(hook, _arc_name, _runs_after) \
-	extern vnetfilter_hook_process_t *hook##_hook_process_list;
+	extern vnetfilter_hook_process_t *hook##_hook_process_list; \
+	int hook##_hook_register(vnetfilter_hook_process_t *h);	    \
+
 foreach_vnetfilter_hook
 #undef _
 

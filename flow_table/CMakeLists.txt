@@ -4,6 +4,17 @@ add_vpp_plugin(flow_table
 	vnetfilter/include/hook.h
 	vnetfilter/vnetfilter.c
 	vnetfilter/node.c
-        vnetfilter/hook.c
+	vnetfilter/hook.c
 	vnetfilter/cli.c
+
+	core/include/flow.h
+	core/include/process.h
+	core/include/protocol.h
+
+	core/init.c
+	core/protocol.c
+	core/proto/unimplemented.c
+	core/proto/tcp.c
+	core/ip4_process.c
+	core/ip6_process.c
 )

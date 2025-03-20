@@ -2,14 +2,14 @@
 #include "include/hook.h"
 
 #define _(hook, _arc_name, _runs_after)										\
-	vnetfilter_hook_process_t *hook##_hook_process_list = NULL;			\
+	vnetfilter_hook_process_t *hook##_hook_process_list = NULL;				\
 																			\
 	void hook##_hook_process(vlib_buffer_t *b, vnetfilter_action_t *action)	\
 	{																		\
 		if (hook##_hook_process_list != NULL) {								\
-			vnetfilter_hook_process_t *hook = hook##_hook_process_list;	\
+			vnetfilter_hook_process_t *hook = hook##_hook_process_list;		\
 			for (int i = 0; i < vec_len(hook##_hook_process_list); i++) {	\
-				vnetfilter_hook_function function = hook->function;		\
+				vnetfilter_hook_function function = hook->function;			\
 				vnetfilter_action_t result = function(b);					\
 				if (result != VNF_ACCEPT) {									\
 					*action = result;										\

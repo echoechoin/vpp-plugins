@@ -17,7 +17,9 @@ typedef struct {
 } vnetfilter_hook_trace_t;
 
 /**
- * @brief packet trace format function
+ * @brief packet trace format function 
+ *
+ * TODO: add more details
  **/
 static u8 * vnetfilter_format_hook_trace (u8 * s, va_list * args)
 {
@@ -61,6 +63,9 @@ void vnetfilter_hook_enable_disable (vnetfilter_main_t *fmp, u32 sw_if_index, ch
 				node_name, arc_name);
 }
 
+/**
+ * @brief call all hook functions and process the action.
+ **/
 static inline void vnetfilter_hook_process(vnetfilter_hook_process_t *process_list, vlib_buffer_t *b, u16 *next)
 {
 	vnetfilter_hook_process_t *hook = process_list;
@@ -72,20 +77,25 @@ static inline void vnetfilter_hook_process(vnetfilter_hook_process_t *process_li
 	for (int j = 0; j < vec_len(process_list); j++) {
 		vnetfilter_hook_function function = hook->function;
 		vnetfilter_action_t result = function(b);
-		if (result == VNF_ACCEPT) {
-			vnet_feature_next_u16(next, b);
-		} else if (result == VNF_DROP) {
-			next[0] = VNETFILTER_HOOK_NEXT_DROP;
-			break;
-		} else if (result == VNF_STOLEN) {
-			next[0] = VNETFILTER_HOOK_NEXT_STOLEN;
-			break;
+		switch (result) {
+			case VNF_ACCEPT:
+				vnet_feature_next_u16(next, b);
+				break;
+			case VNF_DROP:
+				next[0] = VNETFILTER_HOOK_NEXT_DROP;
+				return;
+			case VNF_STOLEN:
+				next[0] = VNETFILTER_HOOK_NEXT_STOLEN;
+				return;
+			case VNF_STOP:
+				vnet_feature_next_u16(next, b);
+				return;
 		}
 	}
 }
 
 /**
- * @brief Hook node function
+ * @brief node function for all hook nodes
  **/
 always_inline uword
 vnetfilter_hook_process_inline (vlib_main_t * vm,
@@ -180,7 +190,7 @@ vnetfilter_hook_process_inline (vlib_main_t * vm,
 foreach_vnetfilter_hook
 #undef _
 
-/** if packet has been stolen **/
+/** if packet has been stolen, trace it only **/
 vlib_node_registration_t vnetfilter_stolen_node;
 VLIB_NODE_FN(vnetfilter_stolen_node) (vlib_main_t * vm, vlib_node_runtime_t * node,
 									  vlib_frame_t * frame)

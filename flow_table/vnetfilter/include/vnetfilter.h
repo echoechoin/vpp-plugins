@@ -21,6 +21,7 @@ typedef enum {
 	VNF_ACCEPT,
 	VNF_DROP,
 	VNF_STOLEN,
+	VNF_STOP,
 } vnetfilter_action_t;
 
 
