@@ -42,4 +42,3 @@ clib_error_t *flow_table_main_init(vlib_main_t *vm)
 
 	return error;
 }
-

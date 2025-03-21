@@ -5,12 +5,12 @@ static vnetfilter_action_t umimplemented_parse_flow_key(vlib_buffer_t *b, flow_k
 	return VNF_ACCEPT;
 }
 
-static vnetfilter_action_t umimplemented_init_state(vlib_buffer_t *b)
+static vnetfilter_action_t umimplemented_init_state(vlib_buffer_t *b, flow_dir_t direction)
 {
 	return VNF_ACCEPT;
 }
 
-static vnetfilter_action_t umimplemented_update_state(vlib_buffer_t *b)
+static vnetfilter_action_t umimplemented_update_state(vlib_buffer_t *b, flow_dir_t direction)
 {
 	return VNF_ACCEPT;
 }

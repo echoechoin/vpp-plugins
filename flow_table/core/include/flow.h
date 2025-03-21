@@ -1,7 +1,6 @@
 #ifndef __included_flow_h__
 #define __included_flow_h__
 
-#include "vlib/main.h"
 #include "vnet/ip/ip4_packet.h"
 #include "vnet/ip/ip6_packet.h"
 #include "vnet/ip/ip_types.h"
@@ -35,11 +34,14 @@ void flow_key_reverse(flow_key_t *key)
 
 /** Flow entry **/
 typedef struct {
-	void *flow;
+	/* where the flow entry is stored */
+	void *flow; /* pointer to flow_t */
 	u8 smac[6];
 	u8 dmac[6];
 	ip_address_t src;
 	ip_address_t dst;
+
+	/* ip protocol: e.g. IP_PROTO_TCP == 6, IP_PROTO_UDP == 17 */
 	u8 protocol;
 	u16 src_port;
 	u16 dst_port;
@@ -56,6 +58,10 @@ typedef struct {
 
 	/* flow state: e.g. tcp state SYN_SENT, SYN_RECV, etc */
 	u8 state;
+
+	/* is tracking the complete three-way handshake? */
+	/* We can judge which direction is the client or server based on this. */
+	bool three_way_handshake;
 } flow_t;
 
 typedef struct {

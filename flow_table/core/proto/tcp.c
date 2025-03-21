@@ -3,37 +3,9 @@
 #include "vlib/init.h"
 #include "vnet/ip/ip_packet.h"
 #include "vnet/tcp/tcp_packet.h"
+#include <stdbool.h>
 
-#define for_each_tcp_state					\
-	_(NONE,			"none",			10) 	\
-	_(CLOSE,		"close",		10)		\
-	_(SYN_SENT,		"syn-sent",		10)		\
-	_(SYN_RECV,		"syn-recv",		10)		\
-	_(ESTABLISHED,	"established",	120)	\
-	_(FIN_WAIT,		"fin-wait",		20)		\
-	_(CLOSE_WAIT,	"close-wait",	20)		\
-	_(TIME_WAIT,	"time-wait",	5)		\
-	_(UNKNOWN,		"unknown",		100)    \
-
-typedef enum {
-#define _(a, b, c) TPC_STATE_##a,
-	for_each_tcp_state
-#undef _
-} tcp_state_t;
-
-__attribute__((unused))
-static const u32 tcp_state_timeout[] = {
-#define _(a, b, c) c,
-	for_each_tcp_state
-#undef _
-};
-
-__attribute__((unused))
-static const char *tcp_state_name[] = {
-#define _(a, b, c) "tcp-state-" b,
-	for_each_tcp_state
-#undef _
-};
+#include "tcp_state_transfer.h"
 
 static vnetfilter_action_t tcp_parse_flow_key(vlib_buffer_t *b, flow_key_t *key)
 {
@@ -43,34 +15,46 @@ static vnetfilter_action_t tcp_parse_flow_key(vlib_buffer_t *b, flow_key_t *key)
 	return VNF_ACCEPT;
 }
 
-static vnetfilter_action_t tcp_init_state(vlib_buffer_t *b)
+static vnetfilter_action_t tcp_init_state(vlib_buffer_t *b, flow_dir_t direction)
 {
-	tcp_header_t *th = (tcp_header_t *)b->data + vnet_buffer(b)->l4_hdr_offset;
-	flow_t *flow = vlib_buffer_get_flow(b);
-	u8 flags = th->flags;
-	u8 state = TPC_STATE_NONE;
+	u8 flags;
+	tcp_state_t init_state; 
+	tcp_event_t event;
+	tcp_header_t *th;
+	flow_t *flow;
 
+	th = (tcp_header_t *)b->data + vnet_buffer(b)->l4_hdr_offset;
+	flow = vlib_buffer_get_flow(b);
+
+	flags = th->flags & TCP_FLAG_CONCERNED;
 	if (flags == TCP_FLAG_SYN)
-		state = TPC_STATE_SYN_SENT;
-	else if (flags == (TCP_FLAG_SYN | TCP_FLAG_ACK))
-		state = TPC_STATE_SYN_RECV;
-	else if (flags == TCP_FLAG_ACK)
-		state = TPC_STATE_ESTABLISHED;
-	else if (flags == TCP_FLAG_FIN)
-		state = TPC_STATE_FIN_WAIT;
-	else if (flags == (TCP_FLAG_FIN | TCP_FLAG_ACK))
-		state = TPC_STATE_CLOSE_WAIT;
-	else if (flags == TCP_FLAG_RST)
-		state = TPC_STATE_CLOSE;
-	else
-		state = TPC_STATE_UNKNOWN; /* for example: no any flags */
+		flow->three_way_handshake = true;
 
-	flow->state = state;
+	init_state = TCP_STATE_NONE;
+	event = flags_to_events(flags);
+	
+	/* Set initial state */
+	flow->state = tcp_state_transfer(init_state, event, direction);
+
 	return VNF_ACCEPT;
 }
 
-static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b)
+static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b, flow_dir_t direction)
 {
+	u8 flags;
+	tcp_event_t event;
+	tcp_header_t *th;
+	flow_t *flow;
+
+	th = (tcp_header_t *)b->data + vnet_buffer(b)->l4_hdr_offset;
+	flow = vlib_buffer_get_flow(b);
+
+	flags = th->flags & TCP_FLAG_CONCERNED;
+	event = flags_to_events(flags);
+
+	/* Update flow state */
+	flow->state = tcp_state_transfer(flow->state, event, direction);
+
 	return VNF_ACCEPT;
 }
 

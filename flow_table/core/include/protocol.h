@@ -6,8 +6,8 @@
 #include "vnet/ip/ip_packet.h"
 
 typedef vnetfilter_action_t (*parse_flow_key_function) (vlib_buffer_t *b, flow_key_t *key);
-typedef vnetfilter_action_t (*init_state_function) (vlib_buffer_t *b);
-typedef vnetfilter_action_t (*update_state_function) (vlib_buffer_t *b);
+typedef vnetfilter_action_t (*init_state_function) (vlib_buffer_t *b, flow_dir_t direction);
+typedef vnetfilter_action_t (*update_state_function) (vlib_buffer_t *b, flow_dir_t direction);
 
 typedef struct {
 	parse_flow_key_function parse_key;
