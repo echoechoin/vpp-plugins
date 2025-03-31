@@ -22,12 +22,8 @@
 																			\
 	int hook##_hook_register(vnetfilter_hook_process_t *hook)				\
 	{																		\
-		if (hook == NULL) {													\
+		if (hook == NULL)  													\
 			return -1;														\
-		}																	\
-		if (hook##_hook_process_list == NULL) {								\
-			hook##_hook_process_list = vec_new(vnetfilter_hook_process_t, 1); \
-		}																	\
 		vec_add1(hook##_hook_process_list, *hook);							\
 		return 0;															\
 	}																		\

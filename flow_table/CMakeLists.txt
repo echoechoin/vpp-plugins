@@ -12,9 +12,14 @@ add_vpp_plugin(flow_table
 	core/include/protocol.h
 
 	core/init.c
+	core/flow.c
 	core/protocol.c
-	core/proto/unimplemented.c
-	core/proto/tcp.c
 	core/ip4_process.c
 	core/ip6_process.c
+
+	core/proto/unimplemented.c
+	core/proto/tcp.c
+	core/proto/tcp_state_transfer.h
+	core/proto/udp.c
+	core/proto/icmp.c
 )

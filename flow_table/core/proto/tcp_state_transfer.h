@@ -1,9 +1,10 @@
 #ifndef __included_tcp_state_transfer_h__
 #define __included_tcp_state_transfer_h__
 
-#include "../include/protocol.h"
-#include "plugins/flow_table/core/include/flow.h"
 #include <stdbool.h>
+
+#include "plugins/flow_table/core/include/flow.h"
+#include "plugins/flow_table/core/include/protocol.h"
 
 /*	ori_state		event		dir		new_state      */
 #define for_each_tcp_state_transfer_entry 				\
@@ -132,9 +133,8 @@ static const u32 tcp_state_timeout[] = {
 #undef _
 };
 
-__attribute__((unused))
 static const char *tcp_state_name[] = {
-#define _(a, b, c, d) "tcp-state-" c,
+#define _(a, b, c, d) c,
 	for_each_tcp_state
 #undef _
 };

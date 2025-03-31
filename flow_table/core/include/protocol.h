@@ -1,18 +1,23 @@
 #ifndef __included_protocol_h__
 #define __included_protocol_h__
 
-#include "../../vnetfilter/include/vnetfilter.h"
-#include "flow.h"
+#include "vlib/init.h"
+#include "vnet/ip/format.h"
 #include "vnet/ip/ip_packet.h"
+
+#include "flow.h"
+#include "plugins/flow_table/vnetfilter/include/vnetfilter.h"
 
 typedef vnetfilter_action_t (*parse_flow_key_function) (vlib_buffer_t *b, flow_key_t *key);
 typedef vnetfilter_action_t (*init_state_function) (vlib_buffer_t *b, flow_dir_t direction);
 typedef vnetfilter_action_t (*update_state_function) (vlib_buffer_t *b, flow_dir_t direction);
+typedef const char * (*format_flow_state_function) (int state);
 
 typedef struct {
 	parse_flow_key_function parse_key;
 	init_state_function init_state;
 	update_state_function update_state;
+	format_flow_state_function format_state;
 } protocol_handler_t;
 
 /**

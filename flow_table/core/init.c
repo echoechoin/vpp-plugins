@@ -2,8 +2,8 @@
 #include <vnet/plugin/plugin.h>
 #include <vppinfra/clib_error.h>
 
-#include "flow_table/vnetfilter/include/vnetfilter.h"
-#include "flow_table/vnetfilter/include/hook.h"
+#include "plugins/flow_table/vnetfilter/include/vnetfilter.h"
+#include "plugins/flow_table/vnetfilter/include/hook.h"
 
 #include "include/process.h"
 #include "include/flow.h"
@@ -27,9 +27,6 @@ static clib_error_t *flow_table_init(vlib_main_t * vm)
 	}
 for_each_flow_table_hook
 #undef _
-
-	/* Initialize flow table */
-	error = flow_table_main_init(vm);
 	return error;
 }
 

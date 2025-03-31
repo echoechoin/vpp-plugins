@@ -1,17 +1,19 @@
-#include "../include/protocol.h"
-#include "plugins/flow_table/core/include/flow.h"
+#include <stdbool.h>
+#include <arpa/inet.h>
+
 #include "vlib/init.h"
 #include "vnet/ip/ip_packet.h"
 #include "vnet/tcp/tcp_packet.h"
-#include <stdbool.h>
 
+#include "plugins/flow_table/core/include/flow.h"
+#include "plugins/flow_table/core/include/protocol.h"
 #include "tcp_state_transfer.h"
 
 static vnetfilter_action_t tcp_parse_flow_key(vlib_buffer_t *b, flow_key_t *key)
 {
-	tcp_header_t *th = (tcp_header_t *)b->data + vnet_buffer(b)->l4_hdr_offset;
-	key->src_port = th->src_port;
-	key->dst_port = th->dst_port;
+	tcp_header_t *th = (tcp_header_t *)(b->data + vnet_buffer(b)->l4_hdr_offset);
+	key->src_port = htons(th->src_port);
+	key->dst_port = htons(th->dst_port);
 	return VNF_ACCEPT;
 }
 
@@ -23,7 +25,7 @@ static vnetfilter_action_t tcp_init_state(vlib_buffer_t *b, flow_dir_t direction
 	tcp_header_t *th;
 	flow_t *flow;
 
-	th = (tcp_header_t *)b->data + vnet_buffer(b)->l4_hdr_offset;
+	th = (tcp_header_t *)(b->data + vnet_buffer(b)->l4_hdr_offset);
 	flow = vlib_buffer_get_flow(b);
 
 	flags = th->flags & TCP_FLAG_CONCERNED;
@@ -46,7 +48,7 @@ static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b, flow_dir_t directi
 	tcp_header_t *th;
 	flow_t *flow;
 
-	th = (tcp_header_t *)b->data + vnet_buffer(b)->l4_hdr_offset;
+	th = (tcp_header_t *)(b->data + vnet_buffer(b)->l4_hdr_offset);
 	flow = vlib_buffer_get_flow(b);
 
 	flags = th->flags & TCP_FLAG_CONCERNED;
@@ -58,10 +60,16 @@ static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b, flow_dir_t directi
 	return VNF_ACCEPT;
 }
 
+static const char *tcp_format_state(int state)
+{
+	return tcp_state_name[state];
+}
+
 static protocol_handler_t tcp_protocol = {
 	.parse_key = tcp_parse_flow_key,
 	.init_state = tcp_init_state,
 	.update_state = tcp_update_state,
+	.format_state = tcp_format_state,
 };
 
 static clib_error_t *tcp_protocol_handler_register(vlib_main_t * vm)

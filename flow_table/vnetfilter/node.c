@@ -27,7 +27,7 @@ static u8 * vnetfilter_format_hook_trace (u8 * s, va_list * args)
 	CLIB_UNUSED (vlib_node_t * node) = va_arg (*args, vlib_node_t *);
 	vnetfilter_hook_trace_t * t = va_arg (*args, vnetfilter_hook_trace_t *);
 
-	s = format (s, "L2_INPUT_IP4_HOOK: sw_if_index %d, next index %d\n",
+	s = format (s, "sw_if_index %d, next index %d\n",
 				t->sw_if_index, t->next_index);
 	return s;
 }
@@ -68,29 +68,27 @@ void vnetfilter_hook_enable_disable (vnetfilter_main_t *fmp, u32 sw_if_index, ch
  **/
 static inline void vnetfilter_hook_process(vnetfilter_hook_process_t *process_list, vlib_buffer_t *b, u16 *next)
 {
-	vnetfilter_hook_process_t *hook = process_list;
-	if (!process_list) {
-		vnet_feature_next_u16(next, b);
-		return;
-	}
+	vnetfilter_action_t result = VNF_ACCEPT;
 
 	for (int j = 0; j < vec_len(process_list); j++) {
-		vnetfilter_hook_function function = hook->function;
-		vnetfilter_action_t result = function(b);
-		switch (result) {
-			case VNF_ACCEPT:
-				vnet_feature_next_u16(next, b);
-				break;
-			case VNF_DROP:
-				next[0] = VNETFILTER_HOOK_NEXT_DROP;
-				return;
-			case VNF_STOLEN:
-				next[0] = VNETFILTER_HOOK_NEXT_STOLEN;
-				return;
-			case VNF_STOP:
-				vnet_feature_next_u16(next, b);
-				return;
-		}
+		result = process_list[j].function(b);
+		if (result != VNF_ACCEPT)
+			break;
+	}
+	switch (result) {
+	case VNF_DROP:
+		next[0] = VNETFILTER_HOOK_NEXT_DROP;
+		break;
+
+	case VNF_STOLEN:
+		next[0] = VNETFILTER_HOOK_NEXT_STOLEN;
+		break;
+
+	case VNF_ACCEPT:
+	case VNF_STOP:
+	default:
+		vnet_feature_next_u16(next, b);
+		break;
 	}
 }
 

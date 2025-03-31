@@ -1,4 +1,4 @@
-#include "../vnetfilter/include/vnetfilter.h"
+#include "plugins/flow_table/vnetfilter/include/vnetfilter.h"
 
 vnetfilter_action_t ip6_pre_process(vlib_buffer_t *b)
 {

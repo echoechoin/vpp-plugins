@@ -5,7 +5,7 @@
 #include "vnet/ip/ip6_packet.h"
 #include "vnet/ip/ip_types.h"
 #include "vppinfra/pool.h"
-#include <vppinfra/types.h>
+#include "vppinfra/types.h"
 
 typedef enum {
 	FLOW_DIR_IN,
@@ -49,9 +49,20 @@ typedef struct {
 
 /** Flow **/
 typedef struct {
+	/* refcount */
+	u32 refcount;
+
+	/* input sw_if_index */
 	u32 sw_if_index;
+
+	/* flow key */
 	flow_key_t key;
+
+	/* flow entry for each direction */
 	flow_entry_t flow_entry[FLOW_DIR_MAX];
+
+	/* ip version */
+	u8 ip_version;
 
 	/* ip protocol: e.g. IP_PROTO_TCP == 6, IP_PROTO_UDP == 17 */
 	u8 protocol;
@@ -83,18 +94,17 @@ typedef struct {
 extern flow_table_main_t flow_table_main;
 
 /**
- * @brief Initialize flow table for each worker
- **/
-clib_error_t *flow_table_main_init(vlib_main_t *vm);
-
-/**
  * @brief Generate hash key from flow key
  **/
 static inline
 uword flow_table_hash(flow_key_t *key)
 {
 	uword hash_key = 0;
-	hash_key = hash_memory(key, sizeof(flow_key_t), 0);
+	hash_key += key->src.ip.ip4.as_u32;
+	hash_key += key->dst.ip.ip4.as_u32;
+	hash_key += key->src_port;
+	hash_key += key->dst_port;
+	hash_key += key->protocol;
 	return hash_key;
 }
 
@@ -137,9 +147,11 @@ u32 flow_table_get_index_by_flow (flow_t *flow)
 static inline
 flow_t *flow_table_alloc_flow()
 {
-	flow_t *flow;
+	flow_t *flow = NULL;
 	flow_table_wrk_ctx_t *wrk = flow_table_get_worker_ctx();
 	pool_get(wrk->flows, flow);
+	if (flow)
+		flow->refcount = 1;
 	return flow;
 }
 
@@ -163,13 +175,18 @@ void flow_table_update_flow(flow_t *flow, flow_key_t *key, flow_dir_t direction)
 static inline
 void flow_table_init_flow(flow_t *flow, flow_key_t *key, u32 sw_if_index, flow_dir_t direction)
 {
-	memset(flow, 0, sizeof(flow_t));
 	flow_table_update_flow(flow, key, direction);
-
+	flow->key = *key;
 	if (sw_if_index != ~0)
 		flow->sw_if_index = sw_if_index;
 }
 
+static inline
+flow_dir_t flow_table_get_direction(flow_entry_t *flow_entry)
+{
+	flow_t *flow = flow_entry->flow;
+	return &(flow->flow_entry[FLOW_DIR_IN]) == flow_entry ? FLOW_DIR_IN : FLOW_DIR_OUT;
+}
 
 /**
  * @brief set FLOW_UNSET means buffer is not associated with any flow.
