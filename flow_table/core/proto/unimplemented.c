@@ -1,3 +1,4 @@
+#include "vlib/vlib.h"
 #include "plugins/flow_table/core/include/protocol.h"
 
 static vnetfilter_action_t umimplemented_parse_flow_key(vlib_buffer_t *b, flow_key_t *key)

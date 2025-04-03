@@ -13,8 +13,8 @@
 #include "plugins/flow_table/vnetfilter/include/vnetfilter.h"
 
 #define IP4_DEBUG 1
-#include <stdio.h>
 #if IP4_DEBUG
+#include <stdio.h>
 #include <arpa/inet.h>
 #endif
 

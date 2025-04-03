@@ -4,6 +4,7 @@
 #include "threads.h"
 
 #include "vlib/cli.h"
+#include "vlib/vlib.h"
 #include "vlib/init.h"
 #include "vppinfra/hash.h"
 #include "vppinfra/pool.h"
@@ -13,6 +14,7 @@
 
 #include "plugins/flow_table/core/include/flow.h"
 #include "plugins/flow_table/core/include/protocol.h"
+#include "plugins/flow_table/core/include/timer.h"
 
 flow_table_main_t flow_table_main;
 
@@ -38,6 +40,12 @@ clib_error_t *flow_table_main_init(vlib_main_t *vm)
 	for (thread = 0; thread < num_threads; thread++) {
 		wrk = &ftm->wrk_ctx[thread];
 		wrk->vm = vlib_get_main_by_index (thread);
+
+		/* init timer wheel */
+		tw_timer_wheel_init_2t_1w_2048sl(&wrk->tw,
+			flow_expired_timers_dispatch, 
+			TIMER_SLOT_INTERVAL, ~0);
+		wrk->tw.last_run_time = vlib_time_now (vm);
 		
 		/* Main thread will not be used if n_threads > 1 */
 		if (num_threads > 1 && thread == 0)

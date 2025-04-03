@@ -1,13 +1,16 @@
 #include <stdbool.h>
 #include <arpa/inet.h>
 
+#include "vlib/vlib.h"
 #include "vlib/init.h"
 #include "vnet/ip/ip_packet.h"
 #include "vnet/tcp/tcp_packet.h"
 
 #include "plugins/flow_table/core/include/flow.h"
 #include "plugins/flow_table/core/include/protocol.h"
-#include "tcp_state_transfer.h"
+#include "plugins/flow_table/core/include/timer.h"
+
+#include "plugins/flow_table/core/proto/tcp_state_transfer.h"
 
 static vnetfilter_action_t tcp_parse_flow_key(vlib_buffer_t *b, flow_key_t *key)
 {
@@ -24,10 +27,10 @@ static vnetfilter_action_t tcp_init_state(vlib_buffer_t *b, flow_dir_t direction
 	tcp_event_t event;
 	tcp_header_t *th;
 	flow_t *flow;
+	flow_table_wrk_ctx_t *wrk = flow_table_get_worker_ctx();
 
 	th = (tcp_header_t *)(b->data + vnet_buffer(b)->l4_hdr_offset);
 	flow = vlib_buffer_get_flow(b);
-
 	flags = th->flags & TCP_FLAG_CONCERNED;
 	if (flags == TCP_FLAG_SYN)
 		flow->three_way_handshake = true;
@@ -37,6 +40,7 @@ static vnetfilter_action_t tcp_init_state(vlib_buffer_t *b, flow_dir_t direction
 	
 	/* Set initial state */
 	flow->state = tcp_state_transfer(init_state, event, direction);
+	flow_expiration_timer_update(&wrk->tw, flow, tcp_state_timeout[flow->state]);
 
 	return VNF_ACCEPT;
 }
@@ -47,15 +51,16 @@ static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b, flow_dir_t directi
 	tcp_event_t event;
 	tcp_header_t *th;
 	flow_t *flow;
+	flow_table_wrk_ctx_t *wrk = flow_table_get_worker_ctx();
 
 	th = (tcp_header_t *)(b->data + vnet_buffer(b)->l4_hdr_offset);
 	flow = vlib_buffer_get_flow(b);
-
 	flags = th->flags & TCP_FLAG_CONCERNED;
 	event = flags_to_events(flags);
 
 	/* Update flow state */
 	flow->state = tcp_state_transfer(flow->state, event, direction);
+	flow_expiration_timer_update(&wrk->tw, flow, tcp_state_timeout[flow->state]);
 
 	return VNF_ACCEPT;
 }

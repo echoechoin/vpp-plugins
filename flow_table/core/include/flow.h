@@ -6,6 +6,7 @@
 #include "vnet/ip/ip_types.h"
 #include "vppinfra/pool.h"
 #include "vppinfra/types.h"
+#include "vppinfra/tw_timer_2t_1w_2048sl.h"
 
 typedef enum {
 	FLOW_DIR_IN,
@@ -73,6 +74,10 @@ typedef struct {
 	/* is tracking the complete three-way handshake? */
 	/* We can judge which direction is the client or server based on this. */
 	bool three_way_handshake;
+
+	/* timer ctx */
+	u32 elt_index;
+	u32 stop_timer_handle;
 } flow_t;
 
 typedef struct {
@@ -84,7 +89,10 @@ typedef struct {
 
 	/* vlib main for each worker */
 	vlib_main_t *vm;
-}flow_table_wrk_ctx_t;
+
+	/* timer wheel for flow expiration */
+	tw_timer_wheel_2t_1w_2048sl_t tw;
+} flow_table_wrk_ctx_t;
 
 typedef struct {
 	/* Context for each worker */
@@ -150,8 +158,12 @@ flow_t *flow_table_alloc_flow()
 	flow_t *flow = NULL;
 	flow_table_wrk_ctx_t *wrk = flow_table_get_worker_ctx();
 	pool_get(wrk->flows, flow);
-	if (flow)
+	if (flow) {
+		memset(flow, 0, sizeof(flow_t));
+		flow->elt_index = flow - wrk->flows;
 		flow->refcount = 1;
+		flow->stop_timer_handle = ~0;
+	}
 	return flow;
 }
 

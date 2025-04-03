@@ -1,3 +1,4 @@
+#include "vlib/vlib.h"
 #include "vlib/init.h"
 #include "vnet/ip/ip_packet.h"
 #include "vnet/tcp/tcp_packet.h"

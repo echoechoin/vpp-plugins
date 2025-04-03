@@ -1,3 +1,4 @@
+#include "vlib/vlib.h"
 #include "vlib/init.h"
 #include "plugins/flow_table/core/include/protocol.h"
 

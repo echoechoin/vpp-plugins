@@ -1,9 +1,10 @@
 #ifndef __included_protocol_h__
 #define __included_protocol_h__
 
+#include "vlib/vlib.h"
 #include "vlib/init.h"
-#include "vnet/ip/format.h"
 #include "vnet/ip/ip_packet.h"
+#include "vnet/ip/format.h"
 
 #include "flow.h"
 #include "plugins/flow_table/vnetfilter/include/vnetfilter.h"

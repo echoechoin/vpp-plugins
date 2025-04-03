@@ -16,6 +16,7 @@ add_vpp_plugin(flow_table
 	core/protocol.c
 	core/ip4_process.c
 	core/ip6_process.c
+	core/timer.c
 
 	core/proto/unimplemented.c
 	core/proto/tcp.c

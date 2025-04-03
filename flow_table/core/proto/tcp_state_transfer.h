@@ -108,15 +108,15 @@
 	_(UNKNOWN,		RST,		OUT,	UNKNOWN)		\
 
 #define for_each_tcp_state					\
-	_(NONE,			0,	"none",			10) \
-	_(CLOSE,		1,	"close",		10)	\
-	_(SYN_SENT,		2,	"syn-sent",		10)	\
-	_(SYN_RCVD,		3,	"syn-recv",		10)	\
-	_(ESTABLISHED,	4,	"established",	120)\
-	_(FIN_WAIT,		5,	"fin-wait",		20)	\
-	_(CLOSE_WAIT,	6,	"close-wait",	20)	\
+	_(NONE,			0,	"none",			5) \
+	_(CLOSE,		1,	"close",		5)	\
+	_(SYN_SENT,		2,	"syn-sent",		5)	\
+	_(SYN_RCVD,		3,	"syn-recv",		5)	\
+	_(ESTABLISHED,	4,	"established",	5)\
+	_(FIN_WAIT,		5,	"fin-wait",		5)	\
+	_(CLOSE_WAIT,	6,	"close-wait",	5)	\
 	_(TIME_WAIT,	7,	"time-wait",	5)	\
-	_(UNKNOWN,		8,	"unknown",		100)\
+	_(UNKNOWN,		8,	"unknown",		5)\
 
 
 typedef enum {
@@ -127,7 +127,7 @@ typedef enum {
 } tcp_state_t;
 
 __attribute__((unused))
-static const u32 tcp_state_timeout[] = {
+static const u64 tcp_state_timeout[] = {
 #define _(a, b, c, d) d,
 	for_each_tcp_state
 #undef _
