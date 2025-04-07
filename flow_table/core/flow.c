@@ -53,7 +53,7 @@ clib_error_t *flow_table_main_init(vlib_main_t *vm)
 
 		pool_init_fixed(wrk->flows, prealloc_flows_per_wrk);
 		memset(wrk->flows, 0, sizeof(flow_t) * prealloc_flows_per_wrk);
-		wrk->flows_hash_table = hash_create(0, 0);
+		wrk->flows_hash_table = hash_create(0, sizeof(flow_entry_t *));
 	}
 
 	return error;

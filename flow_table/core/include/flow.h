@@ -7,6 +7,7 @@
 #include "vppinfra/pool.h"
 #include "vppinfra/types.h"
 #include "vppinfra/tw_timer_2t_1w_2048sl.h"
+#include "vppinfra/xxhash.h"
 
 typedef enum {
 	FLOW_DIR_IN,
@@ -21,7 +22,7 @@ typedef struct {
 	u16 src_port;
 	u16 dst_port;
 	u8 protocol;
-} flow_key_t;
+} __attribute__((aligned(sizeof(u64)))) flow_key_t;
 
 #define SWAP(a, b) do { typeof(a) tmp = (a); (a) = (b); (b) = tmp; } while (0)
 #define FLOW_UNSET 0
@@ -107,13 +108,11 @@ extern flow_table_main_t flow_table_main;
 static inline
 uword flow_table_hash(flow_key_t *key)
 {
-	uword hash_key = 0;
-	hash_key += key->src.ip.ip4.as_u32;
-	hash_key += key->dst.ip.ip4.as_u32;
-	hash_key += key->src_port;
-	hash_key += key->dst_port;
-	hash_key += key->protocol;
-	return hash_key;
+	uword hash = 0;
+	for (int i = 0; i < sizeof (flow_key_t) / sizeof (u64); i++) {
+		hash ^= clib_xxhash(((uword *)key)[i]);
+	}
+	return hash;
 }
 
 /**

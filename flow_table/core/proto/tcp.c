@@ -12,6 +12,8 @@
 
 #include "plugins/flow_table/core/proto/tcp_state_transfer.h"
 
+#define TCP_DEBUG 1
+
 static vnetfilter_action_t tcp_parse_flow_key(vlib_buffer_t *b, flow_key_t *key)
 {
 	tcp_header_t *th = (tcp_header_t *)(b->data + vnet_buffer(b)->l4_hdr_offset);
@@ -38,9 +40,17 @@ static vnetfilter_action_t tcp_init_state(vlib_buffer_t *b, flow_dir_t direction
 	init_state = TCP_STATE_NONE;
 	event = flags_to_events(flags);
 	
+#if TCP_DEBUG
+	printf("last state: %s\n", tcp_state_name[flow->state]);
+#endif
 	/* Set initial state */
 	flow->state = tcp_state_transfer(init_state, event, direction);
 	flow_expiration_timer_update(&wrk->tw, flow, tcp_state_timeout[flow->state]);
+
+#if TCP_DEBUG
+	printf("events: %d\n", event);
+	printf("init flow %u state %s\n", flow->elt_index, tcp_state_name[flow->state]);
+#endif
 
 	return VNF_ACCEPT;
 }
@@ -58,9 +68,17 @@ static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b, flow_dir_t directi
 	flags = th->flags & TCP_FLAG_CONCERNED;
 	event = flags_to_events(flags);
 
+#if TCP_DEBUG
+	printf("last state: %s\n", tcp_state_name[flow->state]);
+#endif
 	/* Update flow state */
 	flow->state = tcp_state_transfer(flow->state, event, direction);
 	flow_expiration_timer_update(&wrk->tw, flow, tcp_state_timeout[flow->state]);
+
+#if TCP_DEBUG
+	printf("events: %d\n", event);
+	printf("update flow %u state %s\n", flow->elt_index, tcp_state_name[flow->state]);
+#endif
 
 	return VNF_ACCEPT;
 }
