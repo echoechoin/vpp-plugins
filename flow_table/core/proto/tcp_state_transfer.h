@@ -8,16 +8,16 @@
 
 /*	ori_state		event		dir		new_state      */
 #define for_each_tcp_state_transfer_entry 				\
-	_(NONE,			UNKNOWN,	IN,		UNKNOWN) 		\
-	_(NONE,			SYN,		IN,		SYN_SENT) 		\
-	_(NONE,			ACK,		IN,		ESTABLISHED)	\
-	_(NONE,			FIN,		IN,		CLOSE) 			\
-	_(NONE,			RST,		IN,		CLOSE) 			\
-	_(NONE,			UNKNOWN,	OUT,	UNKNOWN) 		\
-	_(NONE,			SYN,		OUT,	SYN_SENT) 		\
-	_(NONE,			ACK,		OUT,	ESTABLISHED)	\
-	_(NONE,			FIN,		OUT,	CLOSE) 			\
-	_(NONE,			RST,		OUT,	CLOSE) 			\
+	_(START,		UNKNOWN,	IN,		UNKNOWN) 		\
+	_(START,		SYN,		IN,		SYN_SENT) 		\
+	_(START,		ACK,		IN,		ESTABLISHED)	\
+	_(START,		FIN,		IN,		CLOSE) 			\
+	_(START,		RST,		IN,		CLOSE) 			\
+	_(START,		UNKNOWN,	OUT,	UNKNOWN) 		\
+	_(START,		SYN,		OUT,	SYN_SENT) 		\
+	_(START,		ACK,		OUT,	ESTABLISHED)	\
+	_(START,		FIN,		OUT,	CLOSE) 			\
+	_(START,		RST,		OUT,	CLOSE) 			\
 														\
 	_(CLOSE,		UNKNOWN,	IN,		UNKNOWN)	 	\
 	_(CLOSE,		SYN,		IN,		SYN_SENT)		\
@@ -65,34 +65,34 @@
 														\
 	_(CLOSE_WAIT,	UNKNOWN,	IN,		UNKNOWN) 		\
 	_(CLOSE_WAIT,	SYN,		IN,		UNKNOWN)		\
-	_(CLOSE_WAIT,	ACK,		IN,		ESTABLISHED)	\
-	_(CLOSE_WAIT,	FIN,		IN,		TIME_WAIT) 		\
+	_(CLOSE_WAIT,	ACK,		IN,		CLOSE_WAIT)		\
+	_(CLOSE_WAIT,	FIN,		IN,		CLOSE) 			\
 	_(CLOSE_WAIT,	RST,		IN,		CLOSE) 			\
 	_(CLOSE_WAIT,	UNKNOWN,	OUT,	UNKNOWN) 		\
 	_(CLOSE_WAIT,	SYN,		OUT,	UNKNOWN)		\
-	_(CLOSE_WAIT,	ACK,		OUT,	ESTABLISHED)	\
-	_(CLOSE_WAIT,	FIN,		OUT,	TIME_WAIT) 		\
+	_(CLOSE_WAIT,	ACK,		OUT,	CLOSE_WAIT)		\
+	_(CLOSE_WAIT,	FIN,		OUT,	CLOSE) 			\
 	_(CLOSE_WAIT,	RST,		OUT,	CLOSE) 			\
 														\
 	_(FIN_WAIT,		UNKNOWN,	IN,		UNKNOWN) 		\
 	_(FIN_WAIT,		SYN,		IN,		UNKNOWN)		\
-	_(FIN_WAIT,		ACK,		IN,		ESTABLISHED)	\
-	_(FIN_WAIT,		FIN,		IN,		CLOSE) 			\
+	_(FIN_WAIT,		ACK,		IN,		FIN_WAIT)		\
+	_(FIN_WAIT,		FIN,		IN,		TIME_WAIT) 		\
 	_(FIN_WAIT,		RST,		IN,		CLOSE) 			\
 	_(FIN_WAIT,		UNKNOWN,	OUT,	UNKNOWN) 		\
 	_(FIN_WAIT,		SYN,		OUT,	UNKNOWN)		\
-	_(FIN_WAIT,		ACK,		OUT,	ESTABLISHED)	\
-	_(FIN_WAIT,		FIN,		OUT,	CLOSE) 			\
+	_(FIN_WAIT,		ACK,		OUT,	FIN_WAIT)		\
+	_(FIN_WAIT,		FIN,		OUT,	TIME_WAIT) 		\
 	_(FIN_WAIT,		RST,		OUT,	CLOSE) 			\
 														\
 	_(TIME_WAIT,	UNKNOWN,	IN,		UNKNOWN) 		\
 	_(TIME_WAIT,	SYN,		IN,		SYN_SENT)		\
-	_(TIME_WAIT,	ACK,		IN,		ESTABLISHED)	\
+	_(TIME_WAIT,	ACK,		IN,		UNKNOWN)		\
 	_(TIME_WAIT,	FIN,		IN,		UNKNOWN) 		\
 	_(TIME_WAIT,	RST,		IN,		CLOSE) 			\
 	_(TIME_WAIT,	UNKNOWN,	OUT,	UNKNOWN) 		\
 	_(TIME_WAIT,	SYN,		OUT,	SYN_SENT)		\
-	_(TIME_WAIT,	ACK,		OUT,	ESTABLISHED)	\
+	_(TIME_WAIT,	ACK,		OUT,	UNKNOWN)		\
 	_(TIME_WAIT,	FIN,		OUT,	UNKNOWN) 		\
 	_(TIME_WAIT,	RST,		OUT,	CLOSE) 			\
 														\
@@ -108,15 +108,15 @@
 	_(UNKNOWN,		RST,		OUT,	UNKNOWN)		\
 
 #define for_each_tcp_state					\
-	_(NONE,			0,	"none",			5) \
+	_(START,		0,	"start",		5)	\
 	_(CLOSE,		1,	"close",		5)	\
 	_(SYN_SENT,		2,	"syn-sent",		5)	\
 	_(SYN_RCVD,		3,	"syn-recv",		5)	\
-	_(ESTABLISHED,	4,	"established",	5)\
+	_(ESTABLISHED,	4,	"established",	5)	\
 	_(FIN_WAIT,		5,	"fin-wait",		5)	\
 	_(CLOSE_WAIT,	6,	"close-wait",	5)	\
 	_(TIME_WAIT,	7,	"time-wait",	5)	\
-	_(UNKNOWN,		8,	"unknown",		5)\
+	_(UNKNOWN,		8,	"unknown",		5)	\
 
 
 typedef enum {

@@ -37,7 +37,7 @@ static vnetfilter_action_t tcp_init_state(vlib_buffer_t *b, flow_dir_t direction
 	if (flags == TCP_FLAG_SYN)
 		flow->three_way_handshake = true;
 
-	init_state = TCP_STATE_NONE;
+	init_state = TCP_STATE_START;
 	event = flags_to_events(flags);
 	
 #if TCP_DEBUG
@@ -49,7 +49,7 @@ static vnetfilter_action_t tcp_init_state(vlib_buffer_t *b, flow_dir_t direction
 
 #if TCP_DEBUG
 	printf("events: %d\n", event);
-	printf("init flow %u state %s\n", flow->elt_index, tcp_state_name[flow->state]);
+	printf("init flow %p %u state %s\n", flow, flow->elt_index, tcp_state_name[flow->state]);
 #endif
 
 	return VNF_ACCEPT;
@@ -77,7 +77,7 @@ static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b, flow_dir_t directi
 
 #if TCP_DEBUG
 	printf("events: %d\n", event);
-	printf("update flow %u state %s\n", flow->elt_index, tcp_state_name[flow->state]);
+	printf("update flow %p %u state %s\n", flow, flow->elt_index, tcp_state_name[flow->state]);
 #endif
 
 	return VNF_ACCEPT;

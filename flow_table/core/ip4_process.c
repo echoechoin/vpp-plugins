@@ -88,9 +88,12 @@ vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 		/* Init flow state */
 		protocol_handler_get(protocol)->init_state(b, direction);
 	} else {
-		/* Update flow state */
 		flow_entry = flow_entries[0]; // TODO: process hash collision
-		direction = flow_table_get_direction(flow_entry);
+		flow = flow_entry->flow;
+		vlib_buffer_set_flow(b, flow);
+
+		/* Update flow state */
+		direction = flow_table_get_direction(flow_entry);		
 		protocol_handler_get(protocol)->update_state(b, direction);
 	}
 
