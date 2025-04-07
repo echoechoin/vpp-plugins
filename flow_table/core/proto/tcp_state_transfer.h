@@ -6,7 +6,10 @@
 #include "plugins/flow_table/core/include/flow.h"
 #include "plugins/flow_table/core/include/protocol.h"
 
-/*	ori_state		event		dir		new_state      */
+/**
+ * @brief In the view of CLIENT, the TCP state transfer is as follows:
+ *	ori_state		event		dir		new_state
+ **/
 #define for_each_tcp_state_transfer_entry 				\
 	_(START,		UNKNOWN,	IN,		UNKNOWN) 		\
 	_(START,		SYN,		IN,		SYN_SENT) 		\
