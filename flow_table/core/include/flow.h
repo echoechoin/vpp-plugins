@@ -34,6 +34,14 @@ void flow_key_reverse(flow_key_t *key)
 	SWAP(key->src_port, key->dst_port);
 }
 
+typedef struct  {
+	u32 seq;
+	u32 ack;
+
+	/* sequence number increment or decrement while modifying the playload */
+	u32 seq_inc;
+} tcp_flow_attr_t;
+
 /** Flow entry **/
 typedef struct {
 	/* where the flow entry is stored */
@@ -47,15 +55,19 @@ typedef struct {
 	u8 protocol;
 	u16 src_port;
 	u16 dst_port;
+
+	/* input sw_if_index */
+	u32 sw_if_index;
+
+	union {
+		tcp_flow_attr_t tcp_attr;
+	};
 } flow_entry_t;
 
 /** Flow **/
 typedef struct {
 	/* refcount */
 	u32 refcount;
-
-	/* input sw_if_index */
-	u32 sw_if_index;
 
 	/* flow key */
 	flow_key_t key;
@@ -189,7 +201,7 @@ void flow_table_init_flow(flow_t *flow, flow_key_t *key, u32 sw_if_index, flow_d
 	flow_table_update_flow(flow, key, direction);
 	flow->key = *key;
 	if (sw_if_index != ~0)
-		flow->sw_if_index = sw_if_index;
+		flow->flow_entry[direction].sw_if_index = sw_if_index;
 }
 
 static inline

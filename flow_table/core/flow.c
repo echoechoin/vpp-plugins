@@ -59,28 +59,6 @@ clib_error_t *flow_table_main_init(vlib_main_t *vm)
 	return error;
 }
 
-u8 *format_flow_state (u8 * s, va_list * args) {
-	flow_t *flow = va_arg (*args, flow_t *);
-	u8 * state = (u8 *)protocol_handler_get(flow->protocol)->format_state(flow->state);
-	s = format (s, "%s", state);
-	return s;
-}
-
-u8 *format_flow_entry (u8 * s, va_list * args) {
-	flow_t *flow = va_arg (*args, flow_t *);
-	if (flow->ip_version == 4)
-		s = format (s, "sw_if_index %d, src %U, dst %U, protocol %U, state %U\n",
-					flow->sw_if_index, format_ip4_address, &flow->flow_entry[0].src.ip.ip4.as_u8,
-					format_ip4_address, &flow->flow_entry[0].dst.ip.ip4.as_u8,
-					format_ip_protocol, flow->protocol, format_flow_state, flow);
-	else
-		s = format (s, "sw_if_index %d, src %U, dst %U, protocol %U, state %U\n",
-					flow->sw_if_index, format_ip6_address, &flow->flow_entry[0].src.ip.ip6,
-					format_ip6_address, &flow->flow_entry[0].dst.ip.ip6,
-					format_ip_protocol, flow->protocol, format_flow_state, flow);
-	return s;
-}
-
 static clib_error_t *
 flow_table_display_command_fn (vlib_main_t *vm,
 							unformat_input_t *input,
@@ -106,7 +84,7 @@ flow_table_display_command_fn (vlib_main_t *vm,
 		vec_foreach (flow, wrk->flows) {
 			if (flow->refcount == 0)
 				continue;
-			vlib_cli_output(vm, "%U", format_flow_entry, flow);
+			vlib_cli_output(vm, "%U", protocol_handler_get(flow->protocol)->format_flow, flow);
 		}
 	}
 	vlib_worker_thread_barrier_release (vm);
