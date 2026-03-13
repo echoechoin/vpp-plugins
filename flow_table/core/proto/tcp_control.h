@@ -8,6 +8,7 @@
 #include "vnet/ip/ip.h"
 #include "vnet/ethernet/ethernet.h"
 #include "vnet/ip/ip4_packet.h"
+#include "vnet/ip/ip6_packet.h"
 #include "vnet/tcp/tcp_packet.h"
 
 #include "plugins/flow_table/core/include/flow.h"
@@ -31,7 +32,7 @@ static inline u16 flow_table_ip4_checksum(ip4_header_t *ip4)
 	return ~sum;
 }
 
-/* Calculate TCP checksum with pseudo header */
+/* Calculate TCP checksum with IPv4 pseudo header */
 static inline u16 flow_table_tcp_checksum(ip4_header_t *ip4, tcp_header_t *tcp, u16 tcp_len)
 {
 	u32 sum = 0;
@@ -43,6 +44,48 @@ static inline u16 flow_table_tcp_checksum(ip4_header_t *ip4, tcp_header_t *tcp, 
 	sum += p[0] + p[1] + p[2] + p[3]; /* src and dst IP */
 	sum += htons(ip4->protocol);
 	sum += htons(tcp_len);
+
+	/* TCP header and data */
+	p = (u16 *)tcp;
+	for (i = 0; i < tcp_len / 2; i++)
+		sum += p[i];
+
+	/* Handle odd byte */
+	if (tcp_len & 1)
+		sum += ((u8 *)tcp)[tcp_len - 1];
+
+	/* Fold to 16 bits */
+	while (sum >> 16)
+		sum = (sum & 0xFFFF) + (sum >> 16);
+
+	return ~sum;
+}
+
+/* Calculate TCP checksum with IPv6 pseudo header */
+static inline u16 flow_table_tcp_checksum_ip6(ip6_header_t *ip6, tcp_header_t *tcp, u16 tcp_len)
+{
+	u32 sum = 0;
+	u16 *p;
+	int i;
+
+	/* IPv6 Pseudo header: src_ip (16 bytes), dst_ip (16 bytes), tcp_length (4 bytes), zero (3 bytes), next_header (1 byte) */
+
+	/* Source address (16 bytes = 8 u16 words) */
+	p = (u16 *)&ip6->src_address;
+	for (i = 0; i < 8; i++)
+		sum += p[i];
+
+	/* Destination address (16 bytes = 8 u16 words) */
+	p = (u16 *)&ip6->dst_address;
+	for (i = 0; i < 8; i++)
+		sum += p[i];
+
+	/* Upper-layer packet length (32-bit) */
+	sum += htons(tcp_len >> 16);  /* High 16 bits */
+	sum += htons(tcp_len & 0xFFFF);  /* Low 16 bits */
+
+	/* Next header (protocol) - zero padding + protocol */
+	sum += htons(ip6->protocol);
 
 	/* TCP header and data */
 	p = (u16 *)tcp;
@@ -130,11 +173,18 @@ static inline int tcp_send_reset(flow_t *flow)
 				ethernet_vlan_header_t *inner_vlan = (ethernet_vlan_header_t *)((u8 *)vlan + 4);
 				u16 inner_tci = flow->flow_entry[i].inner_vlan_id & 0x0FFF;
 				inner_vlan->priority_cfi_and_id = clib_host_to_net_u16(inner_tci);
-				inner_vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_IP4);
+				/* Set inner VLAN type based on IP version */
+				if (flow->ip_version == 4)
+					inner_vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_IP4);
+				else
+					inner_vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_IP6);
 				l3_offset += 8;  /* Two VLAN tags = 8 bytes */
 			} else {
-				/* Single VLAN */
-				vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_IP4);
+				/* Single VLAN - set type based on IP version */
+				if (flow->ip_version == 4)
+					vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_IP4);
+				else
+					vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_IP6);
 				l3_offset += 4;  /* One VLAN tag = 4 bytes */
 			}
 		} else {
@@ -166,9 +216,21 @@ static inline int tcp_send_reset(flow_t *flow)
 
 			tcp_len = sizeof(tcp_header_t);
 		} else {
-			// TODO: IPv6 support
-			vlib_buffer_free_one(vm, bi);
-			continue;
+			/* IPv6 header */
+			ip6_header_t *ip6 = (ip6_header_t *)(rst_buffer->data + l3_offset);
+			clib_memset(ip6, 0, sizeof(ip6_header_t));
+
+			/* Version (4 bits) = 6, Traffic Class (8 bits) = 0, Flow Label (20 bits) = 0 */
+			ip6->ip_version_traffic_class_and_flow_label = clib_host_to_net_u32(0x60000000);
+			ip6->payload_length = htons(sizeof(tcp_header_t));
+			ip6->protocol = IP_PROTOCOL_TCP;
+			ip6->hop_limit = 64;
+
+			/* Swap source and destination addresses */
+			clib_memcpy(&ip6->src_address, &flow->flow_entry[i].dst.ip.ip6, sizeof(ip6_address_t));
+			clib_memcpy(&ip6->dst_address, &flow->flow_entry[i].src.ip.ip6, sizeof(ip6_address_t));
+
+			tcp_len = sizeof(tcp_header_t);
 		}
 
 		/* Construct TCP header */
@@ -191,6 +253,9 @@ static inline int tcp_send_reset(flow_t *flow)
 		/* Calculate TCP checksum */
 		if (flow->ip_version == 4) {
 			tcp->checksum = flow_table_tcp_checksum(ip4, tcp, tcp_len);
+		} else {
+			ip6_header_t *ip6 = (ip6_header_t *)(rst_buffer->data + l3_offset);
+			tcp->checksum = flow_table_tcp_checksum_ip6(ip6, tcp, tcp_len);
 		}
 
 		/* Set buffer metadata */
