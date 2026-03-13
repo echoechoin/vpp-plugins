@@ -22,6 +22,11 @@ typedef struct {
 	u16 src_port;
 	u16 dst_port;
 	u8 protocol;
+
+	/* VLAN support */
+	u16 outer_vlan_id;     /* Outer VLAN ID (0 = no VLAN) */
+	u16 inner_vlan_id;     /* Inner VLAN ID (0 = no inner VLAN, for QinQ) */
+	u8 vlan_present;       /* Flag: VLAN present (0 = no, 1 = single, 2 = QinQ) */
 } __attribute__((aligned(sizeof(u64)))) flow_key_t;
 
 #define SWAP(a, b) do { typeof(a) tmp = (a); (a) = (b); (b) = tmp; } while (0)
@@ -58,6 +63,11 @@ typedef struct {
 
 	/* input sw_if_index */
 	u32 sw_if_index;
+
+	/* VLAN information */
+	u16 outer_vlan_id;     /* Outer VLAN ID */
+	u16 inner_vlan_id;     /* Inner VLAN ID (for QinQ) */
+	u8 vlan_present;       /* 0 = no VLAN, 1 = single VLAN, 2 = QinQ */
 
 	union {
 		tcp_flow_attr_t tcp_attr;
@@ -240,6 +250,24 @@ flow_t *vlib_buffer_get_flow(vlib_buffer_t *b)
 	if (flow_index == ~0)
 		return NULL;
 	return flow_table_get_flow_by_index(flow_index);
+}
+
+/**
+ * @brief Format VLAN information for flow display
+ **/
+static inline
+u8 *format_flow_vlan(u8 *s, flow_entry_t *flow_entry)
+{
+	if (flow_entry->vlan_present == 0) {
+		s = format (s, "  VLAN: none\n");
+	} else if (flow_entry->vlan_present == 1) {
+		s = format (s, "  VLAN: %d (802.1Q)\n", flow_entry->outer_vlan_id);
+	} else if (flow_entry->vlan_present == 2) {
+		s = format (s, "  VLAN: %d.%d (QinQ/802.1ad)\n",
+					flow_entry->outer_vlan_id,
+					flow_entry->inner_vlan_id);
+	}
+	return s;
 }
 
 

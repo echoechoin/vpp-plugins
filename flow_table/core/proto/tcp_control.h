@@ -109,18 +109,45 @@ static inline int tcp_send_reset(flow_t *flow)
 		rst_buffer->flags = 0;
 		rst_buffer->current_data = 0;
 
+		u16 l3_offset = sizeof(ethernet_header_t);
+
 		/* Construct Ethernet header */
 		eth = (ethernet_header_t *)rst_buffer->data;
 		memcpy(eth->src_address, flow->flow_entry[i].dmac, 6);
 		memcpy(eth->dst_address, flow->flow_entry[i].smac, 6);
-		if (flow->ip_version == 4)
-			eth->type = htons(ETHERNET_TYPE_IP4);
-		else
-			eth->type = htons(ETHERNET_TYPE_IP6);
+
+		/* Add VLAN tags if present */
+		if (flow->flow_entry[i].vlan_present >= 1) {
+			/* Outer VLAN tag */
+			eth->type = clib_host_to_net_u16(ETHERNET_TYPE_VLAN);
+			ethernet_vlan_header_t *vlan = (ethernet_vlan_header_t *)(eth + 1);
+			u16 tci = flow->flow_entry[i].outer_vlan_id & 0x0FFF;
+			vlan->priority_cfi_and_id = clib_host_to_net_u16(tci);
+
+			if (flow->flow_entry[i].vlan_present == 2) {
+				/* Inner VLAN tag (QinQ) */
+				vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_VLAN);
+				ethernet_vlan_header_t *inner_vlan = (ethernet_vlan_header_t *)((u8 *)vlan + 4);
+				u16 inner_tci = flow->flow_entry[i].inner_vlan_id & 0x0FFF;
+				inner_vlan->priority_cfi_and_id = clib_host_to_net_u16(inner_tci);
+				inner_vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_IP4);
+				l3_offset += 8;  /* Two VLAN tags = 8 bytes */
+			} else {
+				/* Single VLAN */
+				vlan->type = clib_host_to_net_u16(ETHERNET_TYPE_IP4);
+				l3_offset += 4;  /* One VLAN tag = 4 bytes */
+			}
+		} else {
+			/* No VLAN */
+			if (flow->ip_version == 4)
+				eth->type = htons(ETHERNET_TYPE_IP4);
+			else
+				eth->type = htons(ETHERNET_TYPE_IP6);
+		}
 
 		/* Construct IP header */
 		if (flow->ip_version == 4) {
-			ip4 = (ip4_header_t *)(rst_buffer->data + sizeof(ethernet_header_t));
+			ip4 = (ip4_header_t *)(rst_buffer->data + l3_offset);
 			clib_memset(ip4, 0, sizeof(ip4_header_t));
 
 			ip4->ip_version_and_header_length = 0x45;
@@ -146,9 +173,9 @@ static inline int tcp_send_reset(flow_t *flow)
 
 		/* Construct TCP header */
 		if (flow->ip_version == 4)
-			tcp = (tcp_header_t *)(rst_buffer->data + sizeof(ethernet_header_t) + sizeof(ip4_header_t));
+			tcp = (tcp_header_t *)(rst_buffer->data + l3_offset + sizeof(ip4_header_t));
 		else
-			tcp = (tcp_header_t *)(rst_buffer->data + sizeof(ethernet_header_t) + sizeof(ip6_header_t));
+			tcp = (tcp_header_t *)(rst_buffer->data + l3_offset + sizeof(ip6_header_t));
 
 		clib_memset(tcp, 0, sizeof(tcp_header_t));
 		tcp->src_port = htons(flow->flow_entry[i].dst_port);
@@ -171,22 +198,23 @@ static inline int tcp_send_reset(flow_t *flow)
 		rst_buffer->total_length_not_including_first_buffer = 0;
 
 		if (flow->ip_version == 4) {
-			vnet_buffer(rst_buffer)->l3_hdr_offset = sizeof(ethernet_header_t);
-			vnet_buffer(rst_buffer)->l4_hdr_offset = sizeof(ethernet_header_t) + sizeof(ip4_header_t);
-			rst_buffer->current_length = sizeof(ethernet_header_t) + sizeof(ip4_header_t) + sizeof(tcp_header_t);
+			vnet_buffer(rst_buffer)->l3_hdr_offset = l3_offset;
+			vnet_buffer(rst_buffer)->l4_hdr_offset = l3_offset + sizeof(ip4_header_t);
+			rst_buffer->current_length = l3_offset + sizeof(ip4_header_t) + sizeof(tcp_header_t);
 			rst_buffer->flags |= VNET_BUFFER_F_IS_IP4;
 		} else {
-			vnet_buffer(rst_buffer)->l3_hdr_offset = sizeof(ethernet_header_t);
-			vnet_buffer(rst_buffer)->l4_hdr_offset = sizeof(ethernet_header_t) + sizeof(ip6_header_t);
-			rst_buffer->current_length = sizeof(ethernet_header_t) + sizeof(ip6_header_t) + sizeof(tcp_header_t);
+			vnet_buffer(rst_buffer)->l3_hdr_offset = l3_offset;
+			vnet_buffer(rst_buffer)->l4_hdr_offset = l3_offset + sizeof(ip6_header_t);
+			rst_buffer->current_length = l3_offset + sizeof(ip6_header_t) + sizeof(tcp_header_t);
 			rst_buffer->flags |= VNET_BUFFER_F_IS_IP6;
 		}
 
-		rst_buffer->flags |= VLIB_BUFFER_TOTAL_LENGTH_VALID
-						  |  VNET_BUFFER_F_LOCALLY_ORIGINATED
-						  |  VNET_BUFFER_F_L2_HDR_OFFSET_VALID
-						  |  VNET_BUFFER_F_L3_HDR_OFFSET_VALID
-						  |  VNET_BUFFER_F_L4_HDR_OFFSET_VALID;
+		/* Set buffer flags to indicate packet structure and origin */
+		rst_buffer->flags |= VLIB_BUFFER_TOTAL_LENGTH_VALID          /* Total packet length is valid (no chained buffers) */
+						  |  VNET_BUFFER_F_LOCALLY_ORIGINATED        /* Packet originated from VPP (not received from interface) */
+						  |  VNET_BUFFER_F_L2_HDR_OFFSET_VALID       /* L2 (Ethernet) header offset is set and valid */
+						  |  VNET_BUFFER_F_L3_HDR_OFFSET_VALID       /* L3 (IP) header offset is set and valid */
+						  |  VNET_BUFFER_F_L4_HDR_OFFSET_VALID;      /* L4 (TCP) header offset is set and valid */
 
 		vnet_buffer(rst_buffer)->sw_if_index[VLIB_RX] = 0;
 		vnet_buffer(rst_buffer)->sw_if_index[VLIB_TX] = flow->flow_entry[i].sw_if_index;

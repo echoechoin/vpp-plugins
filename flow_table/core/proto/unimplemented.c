@@ -20,18 +20,24 @@ static vnetfilter_action_t umimplemented_update_state(vlib_buffer_t *b, flow_dir
 static u8 *umimplemented_flow_format(u8 *s, va_list *args)
 {
 	flow_t *flow = va_arg (*args, flow_t *);
+
+	/* Format basic flow information */
 	if (flow->ip_version == 4)
 		s = format (s, "sw_if_index %d %d, src %U, dst %U, protocol %U\n",
-				flow->flow_entry[0].sw_if_index, flow->flow_entry[1].sw_if_index,
-				format_ip4_address, &flow->flow_entry[0].src.ip.ip4.as_u8,
-				format_ip4_address, &flow->flow_entry[0].dst.ip.ip4.as_u8,
-				format_ip_protocol, flow->protocol);
+					flow->flow_entry[0].sw_if_index, flow->flow_entry[1].sw_if_index,
+					format_ip4_address, &flow->flow_entry[0].src.ip.ip4.as_u8,
+					format_ip4_address, &flow->flow_entry[0].dst.ip.ip4.as_u8,
+					format_ip_protocol, flow->protocol);
 	else
 		s = format (s, "sw_if_index %d %d, src %U, dst %U, protocol %U\n",
-				flow->flow_entry[0].sw_if_index, flow->flow_entry[1].sw_if_index,
-				format_ip6_address, &flow->flow_entry[0].src.ip.ip6,
-				format_ip6_address, &flow->flow_entry[0].dst.ip.ip6,
-				format_ip_protocol, flow->protocol);
+					flow->flow_entry[0].sw_if_index, flow->flow_entry[1].sw_if_index,
+					format_ip6_address, &flow->flow_entry[0].src.ip.ip6,
+					format_ip6_address, &flow->flow_entry[0].dst.ip.ip6,
+					format_ip_protocol, flow->protocol);
+
+	/* Format VLAN information */
+	s = format_flow_vlan(s, &flow->flow_entry[0]);
+
 	return s;
 }
 

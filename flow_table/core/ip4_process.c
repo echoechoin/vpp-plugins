@@ -18,12 +18,81 @@
 #include <arpa/inet.h>
 #endif
 
+/**
+ * @brief Parse VLAN tags and return VLAN information
+ *
+ * @param b Buffer
+ * @param outer_vlan_id Output: Outer VLAN ID
+ * @param inner_vlan_id Output: Inner VLAN ID
+ * @param vlan_present Output: 0=no VLAN, 1=single VLAN, 2=QinQ
+ * @return L3 header offset
+ */
+static inline u16 parse_vlan_tags(vlib_buffer_t *b, u16 *outer_vlan_id, u16 *inner_vlan_id, u8 *vlan_present)
+{
+	ethernet_header_t *eth;
+	u16 ethertype;
+	u16 l3_offset = sizeof(ethernet_header_t);
+
+	*outer_vlan_id = 0;
+	*inner_vlan_id = 0;
+	*vlan_present = 0;
+
+	eth = (ethernet_header_t *)(b->data + vnet_buffer(b)->l2_hdr_offset);
+	ethertype = clib_net_to_host_u16(eth->type);
+
+	/* Check for outer VLAN tag (802.1Q: 0x8100 or 802.1ad: 0x88a8) */
+	if (ethertype == ETHERNET_TYPE_VLAN || ethertype == ETHERNET_TYPE_DOT1AD) {
+		ethernet_vlan_header_t *vlan = (ethernet_vlan_header_t *)((u8 *)eth + sizeof(ethernet_header_t));
+		*outer_vlan_id = clib_net_to_host_u16(vlan->priority_cfi_and_id) & 0x0FFF;
+		ethertype = clib_net_to_host_u16(vlan->type);
+		l3_offset += 4;  /* VLAN tag is 4 bytes */
+		*vlan_present = 1;
+
+		/* Check for inner VLAN tag (QinQ) */
+		if (ethertype == ETHERNET_TYPE_VLAN) {
+			ethernet_vlan_header_t *inner_vlan = (ethernet_vlan_header_t *)((u8 *)vlan + 4);
+			*inner_vlan_id = clib_net_to_host_u16(inner_vlan->priority_cfi_and_id) & 0x0FFF;
+			ethertype = clib_net_to_host_u16(inner_vlan->type);
+			l3_offset += 4;  /* Inner VLAN tag is also 4 bytes */
+			*vlan_present = 2;
+		}
+	}
+
+	return l3_offset;
+}
+
 vnetfilter_action_t ip4_pre_process(vlib_buffer_t *b)
 {
-	ip4_header_t *ih4 = (ip4_header_t *)(b->data + vnet_buffer(b)->l3_hdr_offset);
-	i16 ihl = (i16)((ih4->ip_version_and_header_length & 0x0F) << 2);
+	u16 outer_vlan_id, inner_vlan_id;
+	u8 vlan_present;
+	u16 l3_offset;
+	ip4_header_t *ih4;
+	i16 ihl;
+
+	/* Parse VLAN tags and get L3 offset */
+	l3_offset = parse_vlan_tags(b, &outer_vlan_id, &inner_vlan_id, &vlan_present);
+	vnet_buffer(b)->l3_hdr_offset = l3_offset;
+
+	/* Parse IP header */
+	ih4 = (ip4_header_t *)(b->data + vnet_buffer(b)->l3_hdr_offset);
+	ihl = (i16)((ih4->ip_version_and_header_length & 0x0F) << 2);
 	vnet_buffer(b)->l4_hdr_offset = (i16)(ihl + vnet_buffer(b)->l3_hdr_offset);
+
+	/* Store VLAN info in buffer opaque2 (unused space) */
+	vnet_buffer2(b)->unused[0] = (outer_vlan_id << 16) | inner_vlan_id;
+	vnet_buffer2(b)->unused[1] = vlan_present;
+
 	vlib_buffer_init_flow(b);
+
+#if IP4_DEBUG
+	if (vlan_present) {
+		printf("--- VLAN detected ---\n");
+		printf("Outer VLAN ID: %u\n", outer_vlan_id);
+		if (vlan_present == 2)
+			printf("Inner VLAN ID: %u (QinQ)\n", inner_vlan_id);
+	}
+#endif
+
     return VNF_ACCEPT;
 }
 
@@ -62,6 +131,12 @@ vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 	key.src_port = 0;
 	key.dst_port = 0;
 
+	/* Extract VLAN info from buffer opaque2 */
+	u32 vlan_data = vnet_buffer2(b)->unused[0];
+	key.outer_vlan_id = (vlan_data >> 16) & 0xFFFF;
+	key.inner_vlan_id = vlan_data & 0xFFFF;
+	key.vlan_present = vnet_buffer2(b)->unused[1];
+
 #if IP4_DEBUG
 	printf("\n\n--- ip4_input_process ---\n");
 #endif
@@ -91,6 +166,11 @@ vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 		/* Learn MAC addresses */
 		memcpy(flow_entry->smac, eth->src_address, 6);
 		memcpy(flow_entry->dmac, eth->dst_address, 6);
+
+		/* Save VLAN information */
+		flow_entry->outer_vlan_id = key.outer_vlan_id;
+		flow_entry->inner_vlan_id = key.inner_vlan_id;
+		flow_entry->vlan_present = key.vlan_present;
 
 		hash_set(hash_table, hash_key, (uword)flow_entry);
 

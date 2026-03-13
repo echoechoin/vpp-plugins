@@ -118,26 +118,36 @@ static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b, flow_dir_t directi
 static u8 *tcp_flow_format(u8 *s, va_list *args)
 {
 	flow_t *flow = va_arg (*args, flow_t *);
+
+	/* Format basic flow information */
 	if (flow->ip_version == 4)
-		s = format (s, "sw_if_index %d %d, src %U, dst %U, protocol %U, state %s\n"
-					"  seq[0] %u, ack[0] %u, seq[1] %u, ack[1] %u\n",
+		s = format (s, "sw_if_index %d %d, src %U:%d, dst %U:%d, protocol %U, state %s\n",
 					flow->flow_entry[0].sw_if_index, flow->flow_entry[1].sw_if_index,
 					format_ip4_address, &flow->flow_entry[0].src.ip.ip4.as_u8,
+					flow->flow_entry[0].src_port,
 					format_ip4_address, &flow->flow_entry[0].dst.ip.ip4.as_u8,
-					format_ip_protocol, flow->protocol, tcp_state_name[flow->state],
-					flow->flow_entry[0].tcp_attr.seq, flow->flow_entry[0].tcp_attr.ack,
-					flow->flow_entry[1].tcp_attr.seq, flow->flow_entry[1].tcp_attr.ack
+					flow->flow_entry[0].dst_port,
+					format_ip_protocol, flow->protocol, tcp_state_name[flow->state]
 				);
 	else
-		s = format (s, "sw_if_index %d %d, src %U, dst %U, protocol %U, state %s\n",
-					"  seq[0] %u, ack[0] %u, seq[1] %u, ack[1] %u\n",
+		s = format (s, "sw_if_index %d %d, src %U:%d, dst %U:%d, protocol %U, state %s\n",
 					flow->flow_entry[0].sw_if_index, flow->flow_entry[1].sw_if_index,
 					format_ip6_address, &flow->flow_entry[0].src.ip.ip6,
+					flow->flow_entry[0].src_port,
 					format_ip6_address, &flow->flow_entry[0].dst.ip.ip6,
-					format_ip_protocol, flow->protocol, tcp_state_name[flow->state],
-					flow->flow_entry[0].tcp_attr.seq, flow->flow_entry[0].tcp_attr.ack,
-					flow->flow_entry[1].tcp_attr.seq, flow->flow_entry[1].tcp_attr.ack
+					flow->flow_entry[0].dst_port,
+					format_ip_protocol, flow->protocol, tcp_state_name[flow->state]
 				);
+
+	/* Format VLAN information */
+	s = format_flow_vlan(s, &flow->flow_entry[0]);
+
+	/* Format TCP sequence numbers */
+	s = format (s, "  seq[0] %u, ack[0] %u, seq[1] %u, ack[1] %u\n",
+				flow->flow_entry[0].tcp_attr.seq, flow->flow_entry[0].tcp_attr.ack,
+				flow->flow_entry[1].tcp_attr.seq, flow->flow_entry[1].tcp_attr.ack
+			);
+
 	return s;
 }
 

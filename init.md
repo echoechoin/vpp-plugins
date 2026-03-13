@@ -241,63 +241,130 @@ sudo ip netns exec namespace-2 ping -c 10 10.0.0.4
 show flow-table
 ```
 
-## 自动化脚本
 
-### 完整环境搭建脚本
 
-已创建以下脚本文件：
-
-1. **`/tmp/setup_vpp_bridge.sh`** - 网络命名空间和 veth 接口设置
-2. **`/tmp/vpp_bridge_config.sh`** - VPP 网桥配置
-3. **`/tmp/test_connectivity.sh`** - 连通性测试
-4. **`/tmp/complete_setup.sh`** - 完整设置流程
-
-### 使用自动化脚本
+### 配置 VLAN
 
 ```bash
-# 1. 设置网络环境
-sudo /tmp/setup_vpp_bridge.sh
-
-# 2. 启动 VPP
-cd /home/echo/vpp
-make run
-
-# 3. 在另一个终端配置 VPP（VPP 运行后）
-sudo /tmp/vpp_bridge_config.sh
-
-# 4. 测试连通性
-sudo /tmp/test_connectivity.sh
+# 在接口上配置 VLAN
+sudo vppctl create sub-interfaces host-veth1 100
+sudo vppctl set interface l2 bridge host-veth1.100 1
 ```
 
-## 清理环境
+### 配置 MAC 学习
 
 ```bash
-# 停止 VPP
-# 在 VPP CLI 中按 Ctrl+C 或执行 quit
+# 禁用 MAC 学习
+sudo vppctl set bridge-domain learn 1 disable
 
-# 删除网络命名空间
-sudo ip netns delete namespace-2
-sudo ip netns delete namespace-4
-
-# 删除 veth 接口（会自动删除）
-sudo ip link delete veth1 2>/dev/null || true
-sudo ip link delete veth3 2>/dev/null || true
+# 启用 MAC 学习
+sudo vppctl set bridge-domain learn 1 enable
 ```
 
-## 高级配置
+## 性能测试
 
-### 启用 flow_table 插件
-
-在 VPP 启动配置中添加：
-
-```
-plugins {
-  plugin flow_table_plugin.so { enable }
-}
-```
-
-或在运行时加载：
+### 使用 iperf3 测试吞吐量
 
 ```bash
-sudo vppctl load_plugin flow_table_plugin.so
+# 在服务器端
+sudo ip netns exec namespace-4 iperf3 -s
+
+# 在客户端
+sudo ip netns exec namespace-2 iperf3 -c 10.0.0.4 -t 30
 ```
+
+### 使用 ping 测试延迟
+
+```bash
+# 测试延迟
+sudo ip netns exec namespace-2 ping -c 100 -i 0.01 10.0.0.4 | tail -1
+```
+
+## VLAN 测试环境搭建
+
+flow_table 插件支持 VLAN (802.1Q) 和 QinQ (802.1ad) 双层 VLAN。以下是 VLAN 测试环境的搭建方法。
+
+### VLAN 网络拓扑
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  namespace-2 (客户端)                                            │
+│                                                                  │
+│  veth2 (物理接口)                                                │
+│    ├── veth2.100 (VLAN 100)    - 10.0.100.2/24                 │
+│    ├── veth2.200 (VLAN 200)    - 10.0.200.2/24                 │
+│    └── veth2.100 (QinQ 100)                                     │
+│         └── veth2.100.50 (QinQ 100.50) - 10.1.0.2/24           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ VLAN tagged traffic
+                              │
+┌─────────────────────────────▼─────────────────────────────────┐
+│                    Default Namespace                           │
+│                                                                │
+│         veth1 (接收 VLAN 标签)                                 │
+│           │                                                    │
+│           └──────────────┬─────────────────────────────────   │
+│                          │                                    │
+│                    ┌─────▼─────┐                              │
+│                    │    VPP    │                              │
+│                    │  Bridge   │  (VLAN-Aware)                │
+│                    │  Domain 1 │                              │
+│                    └─────┬─────┘                              │
+│                          │                                    │
+│         veth3 (发送 VLAN 标签)                                 │
+└──────────────────────────┼────────────────────────────────────┘
+                           │
+                           │ VLAN tagged traffic
+                           │
+┌──────────────────────────▼──────────────────────────────────────┐
+│  namespace-4 (服务器)                                            │
+│                                                                  │
+│  veth4 (物理接口)                                                │
+│    ├── veth4.100 (VLAN 100)    - 10.0.100.4/24                 │
+│    ├── veth4.200 (VLAN 200)    - 10.0.200.4/24                 │
+│    └── veth4.100 (QinQ 100)                                     │
+│         └── veth4.100.50 (QinQ 100.50) - 10.1.0.4/24           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 环境搭建命令（单层 VLAN + QinQ）
+
+创建一个包含所有类型的完整测试环境：
+
+```bash
+# 保持原有的无 VLAN 接口
+# veth2: 10.0.0.2/24
+# veth4: 10.0.0.4/24
+
+# 添加单层 VLAN
+sudo ip netns exec namespace-2 ip link add link veth2 name veth2.100 type vlan id 100
+sudo ip netns exec namespace-2 ip addr add 10.0.100.2/24 dev veth2.100
+sudo ip netns exec namespace-2 ip link set veth2.100 up
+
+sudo ip netns exec namespace-4 ip link add link veth4 name veth4.100 type vlan id 100
+sudo ip netns exec namespace-4 ip addr add 10.0.100.4/24 dev veth4.100
+sudo ip netns exec namespace-4 ip link set veth4.100 up
+
+# 添加 QinQ
+sudo ip netns exec namespace-2 ip link add link veth2 name veth2.200 type vlan proto 802.1ad id 200
+sudo ip netns exec namespace-2 ip link set veth2.200 up
+sudo ip netns exec namespace-2 ip link add link veth2.200 name veth2.200.50 type vlan id 50
+sudo ip netns exec namespace-2 ip addr add 10.2.0.2/24 dev veth2.200.50
+sudo ip netns exec namespace-2 ip link set veth2.200.50 up
+
+sudo ip netns exec namespace-4 ip link add link veth4 name veth4.200 type vlan proto 802.1ad id 200
+sudo ip netns exec namespace-4 ip link set veth4.200 up
+sudo ip netns exec namespace-4 ip link add link veth4.200 name veth4.200.50 type vlan id 50
+sudo ip netns exec namespace-4 ip addr add 10.2.0.4/24 dev veth4.200.50
+sudo ip netns exec namespace-4 ip link set veth4.200.50 up
+```
+
+### VLAN 配置总结
+
+| 网络类型 | 客户端接口 | 客户端 IP | 服务器接口 | 服务器 IP | VLAN 类型 |
+|---------|-----------|----------|-----------|----------|----------|
+| 无 VLAN | veth2 | 10.0.0.2/24 | veth4 | 10.0.0.4/24 | - |
+| VLAN 100 | veth2.100 | 10.0.100.2/24 | veth4.100 | 10.0.100.4/24 | 802.1Q |
+| VLAN 200 | veth2.200 | 10.0.200.2/24 | veth4.200 | 10.0.200.4/24 | 802.1Q |
+| QinQ 100.50 | veth2.100.50 | 10.1.0.2/24 | veth4.100.50 | 10.1.0.4/24 | 802.1ad |

@@ -74,7 +74,6 @@ flow_table_display_command_fn (vlib_main_t *vm,
 	vlib_thread_main_t *vtm = vlib_get_thread_main ();
 	num_threads = 1 /* main thread */  + vtm->n_threads;
 
-	vlib_worker_thread_barrier_sync (vm);
 	for (thread = 0; thread < num_threads; thread++) {
 		wrk = &ftm->wrk_ctx[thread];
 		/* Main thread will not be used if n_threads > 1 */
@@ -87,7 +86,6 @@ flow_table_display_command_fn (vlib_main_t *vm,
 			vlib_cli_output(vm, "%U", protocol_handler_get(flow->protocol)->format_flow, flow);
 		}
 	}
-	vlib_worker_thread_barrier_release (vm);
 	return error;
 }
 
@@ -95,6 +93,7 @@ VLIB_CLI_COMMAND(flow_table_display_command, static) = {
 	.path = "show flow-table",
 	.short_help = "show flow-table",
 	.function = flow_table_display_command_fn,
+	.is_mp_safe = 0,
 };
 
 VLIB_MAIN_LOOP_ENTER_FUNCTION(flow_table_main_init);
