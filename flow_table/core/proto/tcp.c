@@ -37,8 +37,8 @@ static vnetfilter_action_t tcp_track_sequence(vlib_buffer_t *b, flow_dir_t direc
 	flow = vlib_buffer_get_flow(b);
 	th = (tcp_header_t *)(b->data + vnet_buffer(b)->l4_hdr_offset);
 
-	flow->flow_entry[direction].tcp_attr.seq = ntohs(th->seq_number);
-	flow->flow_entry[direction].tcp_attr.ack = ntohs(th->ack_number);
+	flow->flow_entry[direction].tcp_attr.seq = ntohl(th->seq_number);
+	flow->flow_entry[direction].tcp_attr.ack = ntohl(th->ack_number);
 	return VNF_ACCEPT;
 }
 
@@ -104,7 +104,14 @@ static vnetfilter_action_t tcp_update_state(vlib_buffer_t *b, flow_dir_t directi
 	printf("update flow %p %u state %s\n", flow, flow->elt_index, tcp_state_name[flow->state]);
 #endif
 
-	tcp_send_reset(flow);
+	/* Test: Send RST for all packets after connection is established */
+	if (flow->state == TCP_STATE_ESTABLISHED && flow->three_way_handshake) {
+#if TCP_DEBUG
+		printf("Connection established, sending RST for every packet on flow %u\n", flow->elt_index);
+#endif
+		tcp_send_reset(flow);
+	}
+
 	return VNF_ACCEPT;
 }
 

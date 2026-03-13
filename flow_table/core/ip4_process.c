@@ -40,10 +40,14 @@ vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 
 	flow_dir_t direction;
 	ip4_header_t *ih4;
+	ethernet_header_t *eth;
 	flow_key_t key = {0};
 	u8 protocol;
 	ip4_address_t src;
 	ip4_address_t dst;
+
+	/* Parse L2 header for MAC addresses */
+	eth = (ethernet_header_t *)(b->data + vnet_buffer(b)->l2_hdr_offset);
 
 	/* Parse L3 header */
     ih4 = (ip4_header_t *)(b->data + vnet_buffer(b)->l3_hdr_offset);
@@ -83,6 +87,11 @@ vnetfilter_action_t ip4_input_process(vlib_buffer_t *b)
 
 		/* Init flow_entry and store it in hash_table */
 		flow_table_init_flow(flow, &key, sw_if_index, direction);
+
+		/* Learn MAC addresses */
+		memcpy(flow_entry->smac, eth->src_address, 6);
+		memcpy(flow_entry->dmac, eth->dst_address, 6);
+
 		hash_set(hash_table, hash_key, (uword)flow_entry);
 
 		/* Init flow state */
